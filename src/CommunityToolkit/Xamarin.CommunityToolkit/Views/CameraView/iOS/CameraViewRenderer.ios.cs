@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using AVFoundation;
 using Foundation;
 using Photos;
@@ -77,88 +78,13 @@ namespace Xamarin.CommunityToolkit.UI.Views
 				{
 					Element.RaiseMediaCaptured(new MediaCapturedEventArgs(imageData: data));
 				});
-				return;
 			}
-
-			PHObjectPlaceholder? placeholder = null;
-			PHPhotoLibrary.RequestAuthorization(status =>
+			if (e.Item1 is NSUrl outputFileUrl)
 			{
-				if (status != PHAuthorizationStatus.Authorized)
-					return;
-
-				// Save the captured file to the photo library.
-				PHPhotoLibrary.SharedPhotoLibrary.PerformChanges(() =>
-				{
-					var creationRequest = PHAssetCreationRequest.CreationRequestForAsset();
-					if (photoData != null)
-					{
-						creationRequest.AddResource(PHAssetResourceType.Photo, photoData, null);
-						placeholder = creationRequest.PlaceholderForCreatedAsset;
-					}
-					else if (e.Item1 is NSUrl outputFileUrl)
-					{
-						creationRequest.AddResource(
-							PHAssetResourceType.Video,
-							outputFileUrl,
-							new PHAssetResourceCreationOptions
-							{
-								ShouldMoveFile = true
-							});
-						placeholder = creationRequest.PlaceholderForCreatedAsset;
-					}
-				}, (success2, error2) =>
-				{
-					if (!success2)
-					{
-						Debug.WriteLine($"Could not save media to photo library: {error2}");
-						if (error2 != null)
-						{
-							Element.RaiseMediaCaptureFailed(error2.LocalizedDescription);
-							return;
-						}
-						Element.RaiseMediaCaptureFailed($"Could not save media to photo library");
-						return;
-					}
-
-					_ = placeholder ?? throw new NullReferenceException();
-					if (PHAsset.FetchAssetsUsingLocalIdentifiers(new[] { placeholder.LocalIdentifier }, null).firstObject is not PHAsset asset)
-					{
-						Element.RaiseMediaCaptureFailed($"Could not save media to photo library");
-						return;
-					}
-					if (asset.MediaType == PHAssetMediaType.Image)
-					{
-						asset.RequestContentEditingInput(new PHContentEditingInputRequestOptions
-						{
-							CanHandleAdjustmentData = p => true
-						}, (input, info) =>
-						{
-							Device.BeginInvokeOnMainThread(() =>
-							{
-								Element.RaiseMediaCaptured(new MediaCapturedEventArgs(input.FullSizeImageUrl?.Path));
-							});
-						});
-					}
-					else if (asset.MediaType == PHAssetMediaType.Video)
-					{
-						PHImageManager.DefaultManager.RequestAvAsset(asset, new PHVideoRequestOptions
-						{
-							Version = PHVideoRequestOptionsVersion.Original
-						}, (avAsset, mix, info) =>
-						{
-							if (avAsset is not AVUrlAsset urlAsset)
-							{
-								Element.RaiseMediaCaptureFailed($"Could not save media to photo library");
-								return;
-							}
-							Device.BeginInvokeOnMainThread(() =>
-							{
-								Element.RaiseMediaCaptured(new MediaCapturedEventArgs(urlAsset.Url.Path));
-							});
-						});
-					}
-				});
-			});
+				Element.RaiseMediaCaptured(new MediaCapturedEventArgs(path: outputFileUrl.AbsoluteString));
+			}
+			Element.RaiseMediaCaptureFailed("failed");
+			return;
 		}
 
 		protected override void Dispose(bool disposing)

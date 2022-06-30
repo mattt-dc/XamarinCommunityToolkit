@@ -74,7 +74,9 @@ namespace Xamarin.CommunityToolkit.UI.Views
 					}
 					else if (uriSource.Uri != null)
 					{
-						asset = AVUrlAsset.Create(NSUrl.FromString(uriSource.Uri.AbsoluteUri));
+#pragma warning disable CS8604 // Possible null reference argument.
+						asset = AVUrlAsset.Create(url: NSUrl.FromString(uriSource.Uri.AbsoluteUri));
+#pragma warning restore CS8604 // Possible null reference argument.
 					}
 					else
 					{
